@@ -1,0 +1,227 @@
+{
+	"name": "gold_layer",
+	"properties": {
+		"activities": [
+			{
+				"name": "get_silver_last_processed_date",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "dynamic_json",
+						"type": "DatasetReference",
+						"parameters": {
+							"container": "silver",
+							"folder": "monitor",
+							"file": "ogd_mandi_api.json"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "get_gold_last_processed_date",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "dynamic_json",
+						"type": "DatasetReference",
+						"parameters": {
+							"container": "gold",
+							"folder": "monitor",
+							"file": "ogd_mandi_api.json"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "if_new_data_to_process",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "get_gold_last_processed_date",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "get_silver_last_processed_date",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@greater(activity('get_silver_last_processed_date').output.value[0].last_processed_date, activity('get_gold_last_processed_date').output.value[0].last_processed_date)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "data_serving",
+							"type": "ExecuteDataFlow",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataflow": {
+									"referenceName": "data_serving",
+									"type": "DataFlowReference",
+									"parameters": {
+										"price_diff_threshold": {
+											"value": "'0.2'",
+											"type": "Expression"
+										},
+										"date_to_filter": {
+											"value": "'@{activity('get_silver_last_processed_date').output.value[0].last_processed_date}'",
+											"type": "Expression"
+										}
+									},
+									"datasetParameters": {
+										"csvSink": {
+											"container": "gold",
+											"folder": "ogd_mandi_api",
+											"file": {
+												"value": "@{activity('get_silver_last_processed_date').output.value[0].last_processed_date}.csv",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								"compute": {
+									"coreCount": 8,
+									"computeType": "General"
+								},
+								"traceLevel": "Fine"
+							}
+						},
+						{
+							"name": "update_gold_last_processed_date",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "data_serving",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 1,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "JsonSource",
+									"additionalColumns": [
+										{
+											"name": "last_processed_date",
+											"value": {
+												"value": "@{activity('get_silver_last_processed_date').output.value[0].last_processed_date}",
+												"type": "Expression"
+											}
+										}
+									],
+									"storeSettings": {
+										"type": "AzureBlobFSReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "JsonReadSettings"
+									}
+								},
+								"sink": {
+									"type": "JsonSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "JsonWriteSettings"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "dynamic_json",
+									"type": "DatasetReference",
+									"parameters": {
+										"container": "gold",
+										"folder": "monitor",
+										"file": "empty.json"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dynamic_json",
+									"type": "DatasetReference",
+									"parameters": {
+										"container": "gold",
+										"folder": "monitor",
+										"file": "ogd_mandi_api.json"
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"annotations": [],
+		"lastPublishTime": "2025-11-14T04:23:18Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

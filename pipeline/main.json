@@ -1,0 +1,86 @@
+{
+	"name": "main",
+	"properties": {
+		"activities": [
+			{
+				"name": "execute_bronze",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "bronze_layer",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"mandi_ogd_api_ingestion_param": {
+							"value": "@pipeline().parameters.bronze_param",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "execute_silver",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "execute_bronze",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "silver_layer",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "execute_gold",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "execute_silver",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "gold_layer",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			}
+		],
+		"parameters": {
+			"bronze_param": {
+				"type": "object",
+				"defaultValue": {
+					"pagination_limit": "1000"
+				}
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2025-11-14T03:51:42Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

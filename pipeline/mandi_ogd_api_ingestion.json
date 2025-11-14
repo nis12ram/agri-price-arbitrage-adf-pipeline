@@ -1,0 +1,294 @@
+{
+	"name": "mandi_ogd_api_ingestion",
+	"properties": {
+		"activities": [
+			{
+				"name": "get_ogd_api_key",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": "https://keyvaultagriadfnisram.vault.azure.net/secrets/ogd-api-key/13fdc584a379444293da073f23ae55a6?api-version=7.5",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "set_ogd_api_key",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "get_ogd_api_key",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "ogd_api_key",
+					"value": {
+						"value": "@activity('get_ogd_api_key').output.value",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "get_ogd_mandi_metadata",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "set_ogd_api_key",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=@{variables('ogd_api_key')}&format=json&offset=0&limit=0",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "get_last_updated_date",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "dynamic_json",
+						"type": "DatasetReference",
+						"parameters": {
+							"container": "bronze",
+							"folder": "monitor",
+							"file": "ogd_mandi_api.json"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "if_new_data_to_load",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "get_last_updated_date",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "get_ogd_mandi_metadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@greater(activity('get_ogd_mandi_metadata').output.updated_date, activity('get_last_updated_date').output.value[0].last_updated_date)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "mandi_ogd_api_to_lake",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:20:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": true,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "RestSource",
+									"httpRequestTimeout": "00:01:40",
+									"requestInterval": "00.00:00:00.010",
+									"requestMethod": "GET",
+									"paginationRules": {
+										"QueryParameters.{offset}": {
+											"value": "RANGE:0:@{activity('get_ogd_mandi_metadata').output.total}:@{pipeline().parameters.pagination_limit}",
+											"type": "Expression"
+										}
+									}
+								},
+								"sink": {
+									"type": "JsonSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "JsonWriteSettings"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "dynamic_rest_api",
+									"type": "DatasetReference",
+									"parameters": {
+										"base_url": "https://api.data.gov.in",
+										"relative_url": {
+											"value": "resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=@{variables('ogd_api_key')}&format=json&offset={offset}&limit=@{pipeline().parameters.pagination_limit}",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dynamic_json",
+									"type": "DatasetReference",
+									"parameters": {
+										"container": "bronze",
+										"folder": "ogd_mandi_api",
+										"file": {
+											"value": "@{activity('get_ogd_mandi_metadata').output.updated_date}.json",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "update_last_updated_date",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "mandi_ogd_api_to_lake",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 1,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "JsonSource",
+									"additionalColumns": [
+										{
+											"name": "last_updated_date",
+											"value": {
+												"value": "@activity('get_ogd_mandi_metadata').output.updated_date",
+												"type": "Expression"
+											}
+										}
+									],
+									"storeSettings": {
+										"type": "AzureBlobFSReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "JsonReadSettings"
+									}
+								},
+								"sink": {
+									"type": "JsonSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "JsonWriteSettings"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "dynamic_json",
+									"type": "DatasetReference",
+									"parameters": {
+										"container": "bronze",
+										"folder": "monitor",
+										"file": "empty.json"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dynamic_json",
+									"type": "DatasetReference",
+									"parameters": {
+										"container": "bronze",
+										"folder": "monitor",
+										"file": "ogd_mandi_api.json"
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"pagination_limit": {
+				"type": "string",
+				"defaultValue": "10"
+			}
+		},
+		"variables": {
+			"ogd_api_key": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2025-11-11T06:20:14Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

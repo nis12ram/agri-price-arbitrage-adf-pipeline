@@ -1,0 +1,172 @@
+{
+	"name": "data_transformation",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dynamic_json",
+						"type": "DatasetReference"
+					},
+					"name": "mandiOGDDataSource"
+				}
+			],
+			"sinks": [
+				{
+					"linkedService": {
+						"referenceName": "linked_service_adls",
+						"type": "LinkedServiceReference"
+					},
+					"name": "deltaSink"
+				}
+			],
+			"transformations": [
+				{
+					"name": "flattenRecords",
+					"description": "Unroll arrays from records to records with columns 'arrival_date, commodity, district, grade, market, max_price, min_price, modal_price, state, variety'"
+				},
+				{
+					"name": "renameModalPriceCol",
+					"description": "renaming modal_price to modal_price_in_rs_per_quintal"
+				},
+				{
+					"name": "derivedStringCols",
+					"description": "normalizing string columns 'commodity, district, grade, market, state, variety' by setting its value to lower case"
+				},
+				{
+					"name": "filterOutRowsWitNullValues",
+					"description": "filter out rows with null values"
+				},
+				{
+					"name": "dropMaxAndMinPriceCol",
+					"description": "drop max_price & min_price cols"
+				},
+				{
+					"name": "filterOutRowsWithPriceZero",
+					"description": "filter out rows where modal price is zero"
+				},
+				{
+					"name": "filterOutRowsWithEmptyStringInStringCol",
+					"description": "filter out rows with empty string in commodity, state, district & market cols"
+				},
+				{
+					"name": "derivedGradeAndVarietyCols",
+					"description": "empty string in grade col replaced with 'unk' and empty string in variety col replaced with 'unk'"
+				},
+				{
+					"name": "alterRow"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          active as boolean,",
+				"          catalog_uuid as string,",
+				"          count as short,",
+				"          created as integer,",
+				"          created_date as timestamp,",
+				"          desc as string,",
+				"          external_ws as boolean,",
+				"          external_ws_url as string,",
+				"          field as (id as string, name as string, type as string)[],",
+				"          field_exposed as (id as string, name as string, type as string)[],",
+				"          index_name as string,",
+				"          limit as short,",
+				"          message as string,",
+				"          offset as short,",
+				"          org as string[],",
+				"          org_type as string,",
+				"          records as (arrival_date as date, commodity as string, district as string, grade as string, market as string, max_price as short, min_price as short, modal_price as short, state as string, variety as string)[],",
+				"          sector as string[],",
+				"          source as string,",
+				"          status as string,",
+				"          target_bucket as (field as string, index as string, type as string),",
+				"          title as string,",
+				"          total as short,",
+				"          updated as integer,",
+				"          updated_date as timestamp,",
+				"          version as string,",
+				"          visualizable as boolean",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     documentForm: 'documentPerLine',",
+				"     dateFormats: ['dd/MM/yyyy'],",
+				"     timestampFormats: ['dd/MM/yyyy','yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\'']) ~> mandiOGDDataSource",
+				"mandiOGDDataSource foldDown(unroll(records, records),",
+				"     mapColumn(",
+				"          arrival_date = records.arrival_date,",
+				"          commodity = records.commodity,",
+				"          district = records.district,",
+				"          grade = records.grade,",
+				"          market = records.market,",
+				"          max_price = records.max_price,",
+				"          min_price = records.min_price,",
+				"          modal_price = records.modal_price,",
+				"          state = records.state,",
+				"          variety = records.variety",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> flattenRecords",
+				"dropMaxAndMinPriceCol select(mapColumn(",
+				"          arrival_date,",
+				"          commodity,",
+				"          district,",
+				"          grade,",
+				"          market,",
+				"          modal_price_in_rs_per_quintal = modal_price,",
+				"          state,",
+				"          variety",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> renameModalPriceCol",
+				"derivedGradeAndVarietyCols derive(commodity = lower(commodity),",
+				"          district = lower(district),",
+				"          grade = lower(grade),",
+				"          market = lower(market),",
+				"          state = lower(state),",
+				"          variety = lower(variety)) ~> derivedStringCols",
+				"renameModalPriceCol filter(!isNull(arrival_date) && !isNull(commodity) && !isNull(district) && !isNull(grade) && !isNull(market) && !isNull(state) && !isNull(variety) && !isNull(modal_price_in_rs_per_quintal)) ~> filterOutRowsWitNullValues",
+				"flattenRecords select(mapColumn(",
+				"          arrival_date,",
+				"          commodity,",
+				"          district,",
+				"          grade,",
+				"          market,",
+				"          modal_price,",
+				"          state,",
+				"          variety",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> dropMaxAndMinPriceCol",
+				"filterOutRowsWitNullValues filter(notEquals(modal_price_in_rs_per_quintal, 0)) ~> filterOutRowsWithPriceZero",
+				"filterOutRowsWithPriceZero filter(trim(commodity) != '' && trim(district) != '' && trim(market) != '' && trim(state) != '') ~> filterOutRowsWithEmptyStringInStringCol",
+				"filterOutRowsWithEmptyStringInStringCol derive(grade = iif(trim(grade) == '', 'unk', grade),",
+				"          variety = iif(trim(variety) == '', 'unk', variety)) ~> derivedGradeAndVarietyCols",
+				"derivedStringCols alterRow(upsertIf(1==1)) ~> alterRow",
+				"alterRow sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     format: 'delta',",
+				"     compressionType: 'snappy',",
+				"     compressionLevel: 'Fastest',",
+				"     fileSystem: 'silver',",
+				"     folderPath: 'ogd_mandi_api',",
+				"     mergeSchema: false,",
+				"     autoCompact: false,",
+				"     optimizedWrite: false,",
+				"     vacuum: 0,",
+				"     deletable: false,",
+				"     insertable: false,",
+				"     updateable: false,",
+				"     upsertable: true,",
+				"     keys:['arrival_date','commodity','grade','variety','state','district','market'],",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> deltaSink"
+			]
+		}
+	}
+}

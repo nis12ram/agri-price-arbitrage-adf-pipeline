@@ -1,0 +1,132 @@
+{
+	"name": "bronze_layer",
+	"properties": {
+		"activities": [
+			{
+				"name": "execute_mandi_ogd_api_ingestion",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "mandi_ogd_api_ingestion",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"pagination_limit": {
+							"value": "@pipeline().parameters.mandi_ogd_api_ingestion_param.pagination_limit",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "set_logs",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "execute_mandi_ogd_api_ingestion",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "logs",
+					"value": {
+						"value": "@concat('{\"execute_mandi_ogd_api_ingestion\": ', '{\"status\": \"', activity('execute_mandi_ogd_api_ingestion').status, '\", \"message\": \"', if(equals(activity('execute_mandi_ogd_api_ingestion').status, 'Failed'), activity('execute_mandi_ogd_api_ingestion').error.message, 'No error'), '\"}}')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "set_status",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "execute_mandi_ogd_api_ingestion",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "status",
+					"value": {
+						"value": "@if(equals(activity('execute_mandi_ogd_api_ingestion').status, 'Failed'), 'Failed', 'Succeeded')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "if_failed",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "set_logs",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "set_status",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(variables('status'), 'Failed')",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "alert_on_failure",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"mandi_ogd_api_ingestion_param": {
+				"type": "object",
+				"defaultValue": {
+					"pagination_limit": "1000"
+				}
+			}
+		},
+		"variables": {
+			"logs": {
+				"type": "String"
+			},
+			"status": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2025-11-11T06:20:14Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
