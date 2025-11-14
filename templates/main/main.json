@@ -1,0 +1,1512 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name"
+		},
+		"linked_service_adls": {
+			"type": "string"
+		},
+		"linked_servive_rest_api": {
+			"type": "string"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/main')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "execute_bronze",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "bronze_layer",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"mandi_ogd_api_ingestion_param": {
+									"value": "@pipeline().parameters.bronze_param",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "execute_silver",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "execute_bronze",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "silver_layer",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true
+						}
+					},
+					{
+						"name": "execute_gold",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "execute_silver",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "gold_layer",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true
+						}
+					}
+				],
+				"parameters": {
+					"bronze_param": {
+						"type": "object",
+						"defaultValue": {
+							"pagination_limit": "1000"
+						}
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2025-11-14T03:51:42Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/bronze_layer')]",
+				"[concat(variables('factoryId'), '/pipelines/silver_layer')]",
+				"[concat(variables('factoryId'), '/pipelines/gold_layer')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/bronze_layer')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "execute_mandi_ogd_api_ingestion",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "mandi_ogd_api_ingestion",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"pagination_limit": {
+									"value": "@pipeline().parameters.mandi_ogd_api_ingestion_param.pagination_limit",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "set_logs",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "execute_mandi_ogd_api_ingestion",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "logs",
+							"value": {
+								"value": "@concat('{\"execute_mandi_ogd_api_ingestion\": ', '{\"status\": \"', activity('execute_mandi_ogd_api_ingestion').status, '\", \"message\": \"', if(equals(activity('execute_mandi_ogd_api_ingestion').status, 'Failed'), activity('execute_mandi_ogd_api_ingestion').error.message, 'No error'), '\"}}')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "set_status",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "execute_mandi_ogd_api_ingestion",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "status",
+							"value": {
+								"value": "@if(equals(activity('execute_mandi_ogd_api_ingestion').status, 'Failed'), 'Failed', 'Succeeded')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "if_failed",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "set_logs",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "set_status",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@equals(variables('status'), 'Failed')",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "alert_on_failure",
+									"type": "Wait",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"waitTimeInSeconds": 1
+									}
+								}
+							]
+						}
+					}
+				],
+				"parameters": {
+					"mandi_ogd_api_ingestion_param": {
+						"type": "object",
+						"defaultValue": {
+							"pagination_limit": "1000"
+						}
+					}
+				},
+				"variables": {
+					"logs": {
+						"type": "String"
+					},
+					"status": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2025-11-11T06:20:14Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/mandi_ogd_api_ingestion')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/silver_layer')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get_silver_last_processed_date",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "dynamic_json",
+								"type": "DatasetReference",
+								"parameters": {
+									"container": "silver",
+									"folder": "monitor",
+									"file": "ogd_mandi_api.json"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "get_bronze_last_updated_date",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "dynamic_json",
+								"type": "DatasetReference",
+								"parameters": {
+									"container": "bronze",
+									"folder": "monitor",
+									"file": "ogd_mandi_api.json"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "if_new_data_to_process",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "get_silver_last_processed_date",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "get_bronze_last_updated_date",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@greater(activity('get_bronze_last_updated_date').output.value[0].last_updated_date, activity('get_silver_last_processed_date').output.value[0].last_processed_date)",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "data_transformation",
+									"type": "ExecuteDataFlow",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataflow": {
+											"referenceName": "data_transformation",
+											"type": "DataFlowReference",
+											"datasetParameters": {
+												"mandiOGDDataSource": {
+													"container": "bronze",
+													"folder": "ogd_mandi_api",
+													"file": {
+														"value": "@{activity('get_bronze_last_updated_date').output.value[0].last_updated_date}.json",
+														"type": "Expression"
+													}
+												}
+											}
+										},
+										"compute": {
+											"coreCount": 8,
+											"computeType": "General"
+										},
+										"traceLevel": "Fine"
+									}
+								},
+								{
+									"name": "update_silver_last_processed_date",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "data_transformation",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.00:10:00",
+										"retry": 1,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"additionalColumns": [
+												{
+													"name": "last_processed_date",
+													"value": {
+														"value": "@{activity('get_bronze_last_updated_date').output.value[0].last_updated_date}",
+														"type": "Expression"
+													}
+												}
+											],
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "dynamic_json",
+											"type": "DatasetReference",
+											"parameters": {
+												"container": "silver",
+												"folder": "monitor",
+												"file": "empty.json"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "dynamic_json",
+											"type": "DatasetReference",
+											"parameters": {
+												"container": "silver",
+												"folder": "monitor",
+												"file": "ogd_mandi_api.json"
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"annotations": [],
+				"lastPublishTime": "2025-11-12T03:22:38Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/dynamic_json')]",
+				"[concat(variables('factoryId'), '/dataflows/data_transformation')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/gold_layer')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get_silver_last_processed_date",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "dynamic_json",
+								"type": "DatasetReference",
+								"parameters": {
+									"container": "silver",
+									"folder": "monitor",
+									"file": "ogd_mandi_api.json"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "get_gold_last_processed_date",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "dynamic_json",
+								"type": "DatasetReference",
+								"parameters": {
+									"container": "gold",
+									"folder": "monitor",
+									"file": "ogd_mandi_api.json"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "if_new_data_to_process",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "get_gold_last_processed_date",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "get_silver_last_processed_date",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@greater(activity('get_silver_last_processed_date').output.value[0].last_processed_date, activity('get_gold_last_processed_date').output.value[0].last_processed_date)",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "data_serving",
+									"type": "ExecuteDataFlow",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataflow": {
+											"referenceName": "data_serving",
+											"type": "DataFlowReference",
+											"parameters": {
+												"price_diff_threshold": {
+													"value": "'0.2'",
+													"type": "Expression"
+												},
+												"date_to_filter": {
+													"value": "'@{activity('get_silver_last_processed_date').output.value[0].last_processed_date}'",
+													"type": "Expression"
+												}
+											},
+											"datasetParameters": {
+												"csvSink": {
+													"container": "gold",
+													"folder": "ogd_mandi_api",
+													"file": {
+														"value": "@{activity('get_silver_last_processed_date').output.value[0].last_processed_date}.csv",
+														"type": "Expression"
+													}
+												}
+											}
+										},
+										"compute": {
+											"coreCount": 8,
+											"computeType": "General"
+										},
+										"traceLevel": "Fine"
+									}
+								},
+								{
+									"name": "update_gold_last_processed_date",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "data_serving",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.00:10:00",
+										"retry": 1,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"additionalColumns": [
+												{
+													"name": "last_processed_date",
+													"value": {
+														"value": "@{activity('get_silver_last_processed_date').output.value[0].last_processed_date}",
+														"type": "Expression"
+													}
+												}
+											],
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "dynamic_json",
+											"type": "DatasetReference",
+											"parameters": {
+												"container": "gold",
+												"folder": "monitor",
+												"file": "empty.json"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "dynamic_json",
+											"type": "DatasetReference",
+											"parameters": {
+												"container": "gold",
+												"folder": "monitor",
+												"file": "ogd_mandi_api.json"
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"annotations": [],
+				"lastPublishTime": "2025-11-14T04:23:18Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/dynamic_json')]",
+				"[concat(variables('factoryId'), '/dataflows/data_serving')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/mandi_ogd_api_ingestion')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "get_ogd_api_key",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"url": "https://keyvaultagriadfnisram.vault.azure.net/secrets/ogd-api-key/13fdc584a379444293da073f23ae55a6?api-version=7.5",
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "set_ogd_api_key",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "get_ogd_api_key",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "ogd_api_key",
+							"value": {
+								"value": "@activity('get_ogd_api_key').output.value",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "get_ogd_mandi_metadata",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "set_ogd_api_key",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"url": {
+								"value": "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=@{variables('ogd_api_key')}&format=json&offset=0&limit=0",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "get_last_updated_date",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "dynamic_json",
+								"type": "DatasetReference",
+								"parameters": {
+									"container": "bronze",
+									"folder": "monitor",
+									"file": "ogd_mandi_api.json"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "if_new_data_to_load",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "get_last_updated_date",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "get_ogd_mandi_metadata",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@greater(activity('get_ogd_mandi_metadata').output.updated_date, activity('get_last_updated_date').output.value[0].last_updated_date)",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "mandi_ogd_api_to_lake",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.00:20:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": true,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "RestSource",
+											"httpRequestTimeout": "00:01:40",
+											"requestInterval": "00.00:00:00.010",
+											"requestMethod": "GET",
+											"paginationRules": {
+												"QueryParameters.{offset}": {
+													"value": "RANGE:0:@{activity('get_ogd_mandi_metadata').output.total}:@{pipeline().parameters.pagination_limit}",
+													"type": "Expression"
+												}
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "dynamic_rest_api",
+											"type": "DatasetReference",
+											"parameters": {
+												"base_url": "https://api.data.gov.in",
+												"relative_url": {
+													"value": "resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=@{variables('ogd_api_key')}&format=json&offset={offset}&limit=@{pipeline().parameters.pagination_limit}",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "dynamic_json",
+											"type": "DatasetReference",
+											"parameters": {
+												"container": "bronze",
+												"folder": "ogd_mandi_api",
+												"file": {
+													"value": "@{activity('get_ogd_mandi_metadata').output.updated_date}.json",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "update_last_updated_date",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "mandi_ogd_api_to_lake",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.00:10:00",
+										"retry": 1,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"additionalColumns": [
+												{
+													"name": "last_updated_date",
+													"value": {
+														"value": "@activity('get_ogd_mandi_metadata').output.updated_date",
+														"type": "Expression"
+													}
+												}
+											],
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "dynamic_json",
+											"type": "DatasetReference",
+											"parameters": {
+												"container": "bronze",
+												"folder": "monitor",
+												"file": "empty.json"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "dynamic_json",
+											"type": "DatasetReference",
+											"parameters": {
+												"container": "bronze",
+												"folder": "monitor",
+												"file": "ogd_mandi_api.json"
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"parameters": {
+					"pagination_limit": {
+						"type": "string",
+						"defaultValue": "10"
+					}
+				},
+				"variables": {
+					"ogd_api_key": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2025-11-11T06:20:14Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/dynamic_json')]",
+				"[concat(variables('factoryId'), '/datasets/dynamic_rest_api')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/dynamic_json')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "[parameters('linked_service_adls')]",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"container": {
+						"type": "string"
+					},
+					"folder": {
+						"type": "string"
+					},
+					"file": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().file",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().folder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().container",
+							"type": "Expression"
+						}
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/data_transformation')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "dynamic_json",
+								"type": "DatasetReference"
+							},
+							"name": "mandiOGDDataSource"
+						}
+					],
+					"sinks": [
+						{
+							"linkedService": {
+								"referenceName": "[parameters('linked_service_adls')]",
+								"type": "LinkedServiceReference"
+							},
+							"name": "deltaSink"
+						}
+					],
+					"transformations": [
+						{
+							"name": "flattenRecords",
+							"description": "Unroll arrays from records to records with columns 'arrival_date, commodity, district, grade, market, max_price, min_price, modal_price, state, variety'"
+						},
+						{
+							"name": "renameModalPriceCol",
+							"description": "renaming modal_price to modal_price_in_rs_per_quintal"
+						},
+						{
+							"name": "derivedStringCols",
+							"description": "normalizing string columns 'commodity, district, grade, market, state, variety' by setting its value to lower case"
+						},
+						{
+							"name": "filterOutRowsWitNullValues",
+							"description": "filter out rows with null values"
+						},
+						{
+							"name": "dropMaxAndMinPriceCol",
+							"description": "drop max_price & min_price cols"
+						},
+						{
+							"name": "filterOutRowsWithPriceZero",
+							"description": "filter out rows where modal price is zero"
+						},
+						{
+							"name": "filterOutRowsWithEmptyStringInStringCol",
+							"description": "filter out rows with empty string in commodity, state, district & market cols"
+						},
+						{
+							"name": "derivedGradeAndVarietyCols",
+							"description": "empty string in grade col replaced with 'unk' and empty string in variety col replaced with 'unk'"
+						},
+						{
+							"name": "alterRow"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          active as boolean,",
+						"          catalog_uuid as string,",
+						"          count as short,",
+						"          created as integer,",
+						"          created_date as timestamp,",
+						"          desc as string,",
+						"          external_ws as boolean,",
+						"          external_ws_url as string,",
+						"          field as (id as string, name as string, type as string)[],",
+						"          field_exposed as (id as string, name as string, type as string)[],",
+						"          index_name as string,",
+						"          limit as short,",
+						"          message as string,",
+						"          offset as short,",
+						"          org as string[],",
+						"          org_type as string,",
+						"          records as (arrival_date as date, commodity as string, district as string, grade as string, market as string, max_price as short, min_price as short, modal_price as short, state as string, variety as string)[],",
+						"          sector as string[],",
+						"          source as string,",
+						"          status as string,",
+						"          target_bucket as (field as string, index as string, type as string),",
+						"          title as string,",
+						"          total as short,",
+						"          updated as integer,",
+						"          updated_date as timestamp,",
+						"          version as string,",
+						"          visualizable as boolean",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     documentForm: 'documentPerLine',",
+						"     dateFormats: ['dd/MM/yyyy'],",
+						"     timestampFormats: ['dd/MM/yyyy','yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\'']) ~> mandiOGDDataSource",
+						"mandiOGDDataSource foldDown(unroll(records, records),",
+						"     mapColumn(",
+						"          arrival_date = records.arrival_date,",
+						"          commodity = records.commodity,",
+						"          district = records.district,",
+						"          grade = records.grade,",
+						"          market = records.market,",
+						"          max_price = records.max_price,",
+						"          min_price = records.min_price,",
+						"          modal_price = records.modal_price,",
+						"          state = records.state,",
+						"          variety = records.variety",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flattenRecords",
+						"dropMaxAndMinPriceCol select(mapColumn(",
+						"          arrival_date,",
+						"          commodity,",
+						"          district,",
+						"          grade,",
+						"          market,",
+						"          modal_price_in_rs_per_quintal = modal_price,",
+						"          state,",
+						"          variety",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> renameModalPriceCol",
+						"derivedGradeAndVarietyCols derive(commodity = lower(commodity),",
+						"          district = lower(district),",
+						"          grade = lower(grade),",
+						"          market = lower(market),",
+						"          state = lower(state),",
+						"          variety = lower(variety)) ~> derivedStringCols",
+						"renameModalPriceCol filter(!isNull(arrival_date) && !isNull(commodity) && !isNull(district) && !isNull(grade) && !isNull(market) && !isNull(state) && !isNull(variety) && !isNull(modal_price_in_rs_per_quintal)) ~> filterOutRowsWitNullValues",
+						"flattenRecords select(mapColumn(",
+						"          arrival_date,",
+						"          commodity,",
+						"          district,",
+						"          grade,",
+						"          market,",
+						"          modal_price,",
+						"          state,",
+						"          variety",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> dropMaxAndMinPriceCol",
+						"filterOutRowsWitNullValues filter(notEquals(modal_price_in_rs_per_quintal, 0)) ~> filterOutRowsWithPriceZero",
+						"filterOutRowsWithPriceZero filter(trim(commodity) != '' && trim(district) != '' && trim(market) != '' && trim(state) != '') ~> filterOutRowsWithEmptyStringInStringCol",
+						"filterOutRowsWithEmptyStringInStringCol derive(grade = iif(trim(grade) == '', 'unk', grade),",
+						"          variety = iif(trim(variety) == '', 'unk', variety)) ~> derivedGradeAndVarietyCols",
+						"derivedStringCols alterRow(upsertIf(1==1)) ~> alterRow",
+						"alterRow sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     compressionType: 'snappy',",
+						"     compressionLevel: 'Fastest',",
+						"     fileSystem: 'silver',",
+						"     folderPath: 'ogd_mandi_api',",
+						"     mergeSchema: false,",
+						"     autoCompact: false,",
+						"     optimizedWrite: false,",
+						"     vacuum: 0,",
+						"     deletable: false,",
+						"     insertable: false,",
+						"     updateable: false,",
+						"     upsertable: true,",
+						"     keys:['arrival_date','commodity','grade','variety','state','district','market'],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> deltaSink"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/dynamic_json')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/data_serving')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"linkedService": {
+								"referenceName": "[parameters('linked_service_adls')]",
+								"type": "LinkedServiceReference"
+							},
+							"name": "mandiOGDDeltaSource"
+						}
+					],
+					"sinks": [
+						{
+							"linkedService": {
+								"referenceName": "[parameters('linked_service_adls')]",
+								"type": "LinkedServiceReference"
+							},
+							"name": "deltaSink"
+						},
+						{
+							"dataset": {
+								"referenceName": "dynamic_csv",
+								"type": "DatasetReference"
+							},
+							"name": "csvSink"
+						}
+					],
+					"transformations": [
+						{
+							"name": "dailyPriceData"
+						},
+						{
+							"name": "avgPriceData",
+							"description": "computing average price in state for each item "
+						},
+						{
+							"name": "lowPriceData",
+							"description": "dailyPriceData is aliased as lowPriceData "
+						},
+						{
+							"name": "highPriceDate",
+							"description": "dailyPricetData is aliased as highPriceData "
+						},
+						{
+							"name": "selfJoin"
+						},
+						{
+							"name": "joinavgPriceData",
+							"description": "join with 'avgPriceData'"
+						},
+						{
+							"name": "priceDiffThreshold",
+							"description": "filter out rows where price difference between highPriceData & lowPriceData is less then or equal to threshold"
+						},
+						{
+							"name": "derivedPriceDiffPct",
+							"description": "creating new col price_diff_pct to show the price difference between high and low price in percentage relative to average price"
+						},
+						{
+							"name": "highLowPrice",
+							"description": "dropping and renaming cols to clean and format the table"
+						},
+						{
+							"name": "highLowPriceSorted",
+							"description": "Sorting rows on columns 'commodity asc, grade asc, variety asc, state asc, price_diff_pct desc'"
+						},
+						{
+							"name": "alterRow"
+						}
+					],
+					"scriptLines": [
+						"parameters{",
+						"     price_diff_threshold as string (toString('0.08')),",
+						"     date_to_filter as string (toString('1900-01-01'))",
+						"}",
+						"source(output(",
+						"          arrival_date as date,",
+						"          commodity as string,",
+						"          district as string,",
+						"          grade as string,",
+						"          market as string,",
+						"          modal_price_in_rs_per_quintal as short,",
+						"          state as string,",
+						"          variety as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     format: 'delta',",
+						"     compressionType: 'snappy',",
+						"     compressionLevel: 'Fastest',",
+						"     fileSystem: 'silver',",
+						"     folderPath: 'ogd_mandi_api') ~> mandiOGDDeltaSource",
+						"mandiOGDDeltaSource filter(equals(arrival_date, toDate($date_to_filter))) ~> dailyPriceData",
+						"dailyPriceData aggregate(groupBy(commodity,",
+						"          grade,",
+						"          variety,",
+						"          state),",
+						"     avg_price_in_state = round(avg(modal_price_in_rs_per_quintal), 2)) ~> avgPriceData",
+						"dailyPriceData select(mapColumn(",
+						"          arrival_date,",
+						"          commodity,",
+						"          district,",
+						"          grade,",
+						"          market,",
+						"          modal_price_in_rs_per_quintal,",
+						"          state,",
+						"          variety",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> lowPriceData",
+						"lowPriceData select(mapColumn(",
+						"          arrival_date,",
+						"          commodity,",
+						"          district,",
+						"          grade,",
+						"          market,",
+						"          modal_price_in_rs_per_quintal,",
+						"          state,",
+						"          variety",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> highPriceDate",
+						"highPriceDate, lowPriceData join(highPriceDate@commodity == lowPriceData@commodity",
+						"     && highPriceDate@grade == lowPriceData@grade",
+						"     && highPriceDate@variety == lowPriceData@variety",
+						"     && highPriceDate@state == lowPriceData@state",
+						"     && highPriceDate@market != lowPriceData@market,",
+						"     joinType:'inner',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'left')~> selfJoin",
+						"selfJoin, avgPriceData join(highPriceDate@commodity == avgPriceData@commodity",
+						"     && highPriceDate@grade == avgPriceData@grade",
+						"     && highPriceDate@variety == avgPriceData@variety",
+						"     && highPriceDate@state == avgPriceData@state,",
+						"     joinType:'inner',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'auto')~> joinavgPriceData",
+						"joinavgPriceData filter(((highPriceDate@modal_price_in_rs_per_quintal - lowPriceData@modal_price_in_rs_per_quintal) / avg_price_in_state) > toDouble($price_diff_threshold)) ~> priceDiffThreshold",
+						"priceDiffThreshold derive(price_diff_pct = round(((highPriceDate@modal_price_in_rs_per_quintal - lowPriceData@modal_price_in_rs_per_quintal) / avg_price_in_state) * 100, 2)) ~> derivedPriceDiffPct",
+						"derivedPriceDiffPct select(mapColumn(",
+						"          arrival_date = highPriceDate@arrival_date,",
+						"          commodity = highPriceDate@commodity,",
+						"          grade = highPriceDate@grade,",
+						"          variety = highPriceDate@variety,",
+						"          state = highPriceDate@state,",
+						"          price_diff_pct,",
+						"          district_with_high_price = highPriceDate@district,",
+						"          market_with_high_price = highPriceDate@market,",
+						"          high_price = highPriceDate@modal_price_in_rs_per_quintal,",
+						"          district_with_low_price = lowPriceData@district,",
+						"          market_with_low_price = lowPriceData@market,",
+						"          low_price = lowPriceData@modal_price_in_rs_per_quintal,",
+						"          avg_price_in_state",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> highLowPrice",
+						"highLowPrice sort(asc(commodity, true),",
+						"     asc(grade, true),",
+						"     asc(variety, true),",
+						"     asc(state, true),",
+						"     desc(price_diff_pct, true)) ~> highLowPriceSorted",
+						"highLowPriceSorted alterRow(insertIf(1==1)) ~> alterRow",
+						"alterRow sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     compressionType: 'snappy',",
+						"     compressionLevel: 'Fastest',",
+						"     fileSystem: 'gold',",
+						"     folderPath: (concat('ogd_mandi_api/', $date_to_filter)),",
+						"     overwrite: true,",
+						"     mergeSchema: false,",
+						"     autoCompact: false,",
+						"     optimizedWrite: false,",
+						"     vacuum: 0,",
+						"     deletable: false,",
+						"     insertable: true,",
+						"     updateable: false,",
+						"     upsertable: false,",
+						"     keys:['arrival_date','commodity','grade','variety','state','district_with_high_price','district_with_low_price','market_with_high_price','market_with_low_price'],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     saveOrder: 1) ~> deltaSink",
+						"alterRow sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     partitionBy('hash', 1)) ~> csvSink"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/dynamic_csv')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/dynamic_rest_api')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "[parameters('linked_servive_rest_api')]",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"base_url": {
+							"value": "@dataset().base_url",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"base_url": {
+						"type": "string"
+					},
+					"relative_url": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "RestResource",
+				"typeProperties": {
+					"relativeUrl": {
+						"value": "@dataset().relative_url",
+						"type": "Expression"
+					}
+				},
+				"schema": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/dynamic_csv')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "[parameters('linked_service_adls')]",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"container": {
+						"type": "string"
+					},
+					"folder": {
+						"type": "string"
+					},
+					"file": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().file",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().folder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().container",
+							"type": "Expression"
+						}
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": []
+		}
+	]
+}
