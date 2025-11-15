@@ -42,8 +42,16 @@ From the initial analysis, Surya found that the daily data volume is only a few 
 
 Since the transformations are not highly complex, Surya opted to use ADF Data Flows instead of Databricks.
 
-## **
+## *Pipeline*
+Surya designs a multi-layered data pipeline using Azure Data Factory (ADF)
 
+### **Pipeline for bronze layer**
+#### *manid_ogd_api_ingestion*
+<img width="1743" height="616" alt="adf_rest_api_ingestion_edited" src="https://github.com/user-attachments/assets/5a78e6a7-eed3-4431-b965-19d0137cc9c3" />
+An ingestion pipeline that retrieves the latest daily commodity prices from the OGD API and loads only new or updated records.
+	"description": "An ingestion pipeline that retrieves the latest daily commodity prices from the OGD API and loads only new or updated records into ADLS in JSON format. The pipeline uses Azure Key Vault to securely access the OGD API key and first collects API metadata to intelligently determine whether new data is available before performing any ingestion.",
+*Working*
+- 
 
 
 
