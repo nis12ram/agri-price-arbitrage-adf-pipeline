@@ -84,6 +84,10 @@ An ingestion pipeline that retrieves the latest daily commodity prices from the 
 **Surya's optimizations = ["Dynamic pagination rules", "Setting maximum number of retry attempts to 2", "Using parametrized datasets(dynamic_rest_api(params = [base_url ,relative_url]), dynamic_json(params = [container, folder, file])"]**
 
 - Using a Copy Activity to update the date of the pipeline's last data refresh
+  
+<img width="1245" height="583" alt="agri9" src="https://github.com/user-attachments/assets/c3f877e8-ea44-478d-93e7-e0794ac565cc" />
+<img width="1742" height="721" alt="agri10" src="https://github.com/user-attachments/assets/3816ea5d-e546-4ce7-9f42-2e87ea85b635" />
+<img width="997" height="582" alt="agri11" src="https://github.com/user-attachments/assets/04c82f2f-0570-442d-9c3e-275b090ff376" />
 
 ion": "An ingestion pipeline that retrieves the latest daily commodity prices from the OGD API and loads only new or updated records into ADLS in JSON format. The pipeline uses Azure Key Vault to securely access the OGD API key and first collects API metadata to intelligently determine whether new data is available before performing any ingestion.",
 
