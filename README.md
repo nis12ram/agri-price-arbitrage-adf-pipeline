@@ -46,12 +46,19 @@ Since the transformations are not highly complex, Surya opted to use ADF Data Fl
 Surya designs a multi-layered data pipeline using Azure Data Factory (ADF)
 
 ### **Pipeline for bronze layer**
-#### *manid_ogd_api_ingestion*
+#### *mandi_ogd_api_ingestion*
 <img width="1743" height="616" alt="adf_rest_api_ingestion_edited" src="https://github.com/user-attachments/assets/5a78e6a7-eed3-4431-b965-19d0137cc9c3" />
+
 An ingestion pipeline that retrieves the latest daily commodity prices from the OGD API and loads only new or updated records.
-	"description": "An ingestion pipeline that retrieves the latest daily commodity prices from the OGD API and loads only new or updated records into ADLS in JSON format. The pipeline uses Azure Key Vault to securely access the OGD API key and first collects API metadata to intelligently determine whether new data is available before performing any ingestion.",
+
 *Working*
-- 
+- Using a Web Activity to fetch the OGD API key from Azure Key Vault.
+<img width="890" height="648" alt="agri1" src="https://github.com/user-attachments/assets/e4f411c6-3610-46b8-8869-0431e65629eb" />
+
+**Surya's optimizations = ["Setting maximum number of retry attempts to 2", "Enabling Secure Input & Output options to prevent API key from being exposed in logs."]**
+
+"description": "An ingestion pipeline that retrieves the latest daily commodity prices from the OGD API and loads only new or updated records into ADLS in JSON format. The pipeline uses Azure Key Vault to securely access the OGD API key and first collects API metadata to intelligently determine whether new data is available before performing any ingestion.",
+
 
 
 
