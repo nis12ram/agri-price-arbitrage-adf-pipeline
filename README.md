@@ -11,7 +11,7 @@ They want to find a market where an item is cheap and another market in that sam
 
 To do this, they hired Surya, a data engineer👨‍💻. His job is to get the daily commodity data every morning and transform it to highlight these specific, in-state profit opportunities for the trading team.
 
-***And now in the remaining part, we will see how Surya***👨‍💻 ***approaches these problem...***
+***Next, we’ll explore how Surya***👨‍💻 ***tackles this problem...***
 
 ## *Architecture Overview*
 To solve AgriBridge's problem, Surya decided to use ***medallion lakehouse architecture*** to build a clean, trustworthy, and durable data pipeline.
