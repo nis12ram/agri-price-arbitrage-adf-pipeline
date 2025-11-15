@@ -141,7 +141,7 @@ A silver-layer pipeline that intelligently transforms only new raw JSON data fro
 
 <img width="1833" height="565" alt="agri22" src="https://github.com/user-attachments/assets/1abb7dbb-3b41-4c09-b927-30ce62862813" />
 
-**Surya's optimizations = ["Using a single Delta table to store all daily cleansed data, rather than creating a new table each day.", "Using UPSERT in the sink ensures that reruns after a pipeline failure or smae day data update do not introduce duplicates, keeping the Delta table clean and consistent."]**
+**Surya's optimizations = ["Using a single Delta table to store all daily cleansed data, rather than creating a new table each day.", "Using UPSERT in the sink ensures that reruns after a pipeline failure or same day data update do not introduce duplicates, keeping the Delta table clean and consistent."]**
 
 - Using a Copy activity to update the pipeline’s last processed date..
   
