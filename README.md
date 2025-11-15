@@ -110,3 +110,16 @@ A bronze-layer orchestration pipeline that triggers the mandi_ogd_api_ingestion 
 - Using an If Condition activity to trigger an alert when `mandi_ogd_api_ingestion` fails.
 <img width="1560" height="618" alt="agri16" src="https://github.com/user-attachments/assets/97f1bbfd-98df-467b-814f-646ee90cbe7f" />
 
+#### *silver_layer*
+<img width="1605" height="577" alt="agri17" src="https://github.com/user-attachments/assets/711fab80-009f-48d9-96cb-c02e5ab60668" />
+
+A silver-layer pipeline that intelligently transforms only new raw JSON data from the bronze layer in ADLS using a data flow named data_transformation. The processed data is then stored in ADLS in Delta format.
+
+*Working*
+- Using a Lookup activity to retrieve the date when the `silver_layer` pipeline last processed data.
+<img width="946" height="637" alt="agri18" src="https://github.com/user-attachments/assets/038ae160-7c2e-4455-96b6-e535e5a9b798" />
+
+- 
+
+
+
