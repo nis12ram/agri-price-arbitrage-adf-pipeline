@@ -45,6 +45,11 @@ Since the transformations are not highly complex, Surya opted to use ADF Data Fl
 ## *Pipeline*
 Surya designs a multi-layered data pipeline using Azure Data Factory (ADF)
 
+### *parametrized datasets*
+<img width="1466" height="640" alt="agri40" src="https://github.com/user-attachments/assets/b582d027-00f2-4dee-a360-4323ed36c861" />
+<img width="1461" height="546" alt="agri41" src="https://github.com/user-attachments/assets/012c5f95-cbb1-43c0-b0fa-c0d8ecaa4204" />
+<img width="1431" height="556" alt="agri42" src="https://github.com/user-attachments/assets/1ab2f74b-4f23-4127-bb0a-e25a6bebe173" />
+
 
 ### *mandi_ogd_api_ingestion*
 <img width="1743" height="616" alt="adf_rest_api_ingestion_edited" src="https://github.com/user-attachments/assets/5a78e6a7-eed3-4431-b965-19d0137cc9c3" />
@@ -78,7 +83,9 @@ An ingestion pipeline that retrieves the latest daily commodity prices from the 
 - Using a Copy Activity to bring data from OGD API to bronze container of ADLS.
   
 <img width="1700" height="737" alt="agri6" src="https://github.com/user-attachments/assets/961aee32-90c7-4053-81d8-33303a02e414" />
+
 <img width="1742" height="658" alt="agri7" src="https://github.com/user-attachments/assets/73aca41b-809d-45bb-b2c7-2584f53e7898" />
+
 <img width="1712" height="687" alt="agri8" src="https://github.com/user-attachments/assets/7da8bc27-fec8-4a67-b65f-6bf35f72dd88" />
 
 **Surya's optimizations = ["Dynamic pagination rules", "Setting maximum number of retry attempts to 2", "Using parametrized datasets(dynamic_rest_api(params = [base_url ,relative_url]), dynamic_json(params = [container, folder, file])"]**
@@ -137,7 +144,9 @@ A silver-layer pipeline that intelligently transforms only new raw JSON data fro
 - Using a Copy activity to update the pipeline’s last processed date..
   
 <img width="1087" height="582" alt="agri23" src="https://github.com/user-attachments/assets/a5fd9b42-de62-4a4d-962d-244aecdc9fc2" />
+
 <img width="1687" height="727" alt="agri24" src="https://github.com/user-attachments/assets/2b75b3b1-0b71-410a-b184-adec55dace0a" />
+
 <img width="1122" height="571" alt="agri25" src="https://github.com/user-attachments/assets/2f6f8611-e105-46ef-a261-c8c2958cd81b" />
 
 ### *gold_layer*
@@ -161,13 +170,93 @@ A gold-layer pipeline that intelligently processes only new data from the silver
 - Using a Data Flow Activity to execute `data_serving` data flow.
 
 <img width="1753" height="722" alt="agri30" src="https://github.com/user-attachments/assets/bb1a1cb4-1eea-42db-b1d8-c3ea7a0c2dd5" />
+
 <img width="820" height="506" alt="agri31" src="https://github.com/user-attachments/assets/01fd1af8-7236-4673-babf-28d40ed1e73f" />
+
+*sql implementation of gold layer logic*
+
+```sql
+WITH daily_price_data AS (
+  SELECT *
+  FROM workspace.default.ogd_mandi
+  WHERE arrival_date = '2025-11-06'
+), avg_price_data (
+  SELECT commodity, grade, variety, state, ROUND(AVG(modal_price_in_rs_per_quintal), 2) AS avg_price_in_state
+  FROM daily_price_data
+  GROUP BY commodity, grade, variety, state
+), high_low_price AS (
+  SELECT high_price_data.arrival_date,
+    high_price_data.commodity, 
+    high_price_data.grade,
+    high_price_data.variety, 
+    high_price_data.state, 
+    ROUND(((high_price_data.modal_price_in_rs_per_quintal - low_price_data.modal_price_in_rs_per_quintal) / avg_price_data.avg_price_in_state)* 100, 2) AS price_diff_pct,
+    high_price_data.district AS district_with_high_price,
+    high_price_data.market AS market_with_high_price,
+    high_price_data.modal_price_in_rs_per_quintal AS high_price,
+    low_price_data.district AS district_with_low_price,
+    low_price_data.market AS market_with_low_price,
+    low_price_data.modal_price_in_rs_per_quintal AS low_price,
+    avg_price_data.avg_price_in_state
+  FROM daily_price_data high_price_data
+  INNER JOIN daily_price_data low_price_data
+  ON high_price_data.commodity = low_price_data.commodity
+    AND high_price_data.grade = low_price_data.grade
+    AND high_price_data.variety = low_price_data.variety
+    AND high_price_data.state = low_price_data.state
+    AND high_price_data.market != low_price_data.market 
+  INNER JOIN avg_price_data
+  ON high_price_data.commodity = avg_price_data.commodity
+    AND high_price_data.grade = avg_price_data.grade
+    AND high_price_data.variety = avg_price_data.variety
+    AND high_price_data.state = avg_price_data.state
+  WHERE((high_price_data.modal_price_in_rs_per_quintal - low_price_data.modal_price_in_rs_per_quintal) / avg_price_data.avg_price_in_state) > 0.08
+  ORDER BY commodity, grade, variety, state, price_diff_pct DESC
+)
+
+SELECT *
+FROM high_low_price
+```
+
+*data flow implementation of gold layer logic*
+
 <img width="1792" height="623" alt="agri32" src="https://github.com/user-attachments/assets/4f64dfe2-ffcd-4315-a98f-baf2fe4bf467" />
 
 - Using a Copy activity to update the pipeline’s last processed date..
 
 <img width="1182" height="580" alt="agri33" src="https://github.com/user-attachments/assets/45498462-aa62-429d-8760-0836b8d76d4f" />
+
 <img width="1835" height="778" alt="agri34" src="https://github.com/user-attachments/assets/096a5669-f035-4f87-84d1-0d0bb53feb22" />
+
 <img width="1147" height="583" alt="agri35" src="https://github.com/user-attachments/assets/6bf9db62-0bb7-49f3-9de9-2c5f4800fa04" />
 
-### *main_layer*
+### *main*
+
+<img width="1672" height="643" alt="agri36" src="https://github.com/user-attachments/assets/6a522561-f7d7-4d8c-9d49-2dc1c9721a1c" />
+
+The main orchestration pipeline that sequentially connects and executes the bronze, silver, and gold layers.
+
+*Working*
+- Using a Execute Pipeline Activity to execute `bronze_layer` pipeline.
+
+<img width="1451" height="605" alt="agri37" src="https://github.com/user-attachments/assets/2f7c6b4f-90f3-4c62-bd38-dfbb9089f7f9" />
+
+- Using a Execute Pipeline Activity to execute `silver_layer` pipeline.
+
+<img width="1271" height="532" alt="agri38" src="https://github.com/user-attachments/assets/11c6c528-44fc-4c89-a410-496bdf553efe" />
+
+- Using a Execute Pipeline Activity to execute `gold_layer` pipeline.
+
+<img width="1016" height="553" alt="agri39" src="https://github.com/user-attachments/assets/17c7198e-8096-4fbf-8f72-eeb4327e8b32" />
+
+## *Conclusion*
+By building this ADF-driven automated pipeline, Surya enables AgriBridge to:
+
+- Detect profitable opportunities instantly  
+- Compare markets within states accurately  
+- Generate actionable insights every morning  
+- Standardize and store clean historical data(silver layer data).  
+
+
+
+
