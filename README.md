@@ -89,8 +89,24 @@ An ingestion pipeline that retrieves the latest daily commodity prices from the 
 <img width="1742" height="721" alt="agri10" src="https://github.com/user-attachments/assets/3816ea5d-e546-4ce7-9f42-2e87ea85b635" />
 <img width="997" height="582" alt="agri11" src="https://github.com/user-attachments/assets/04c82f2f-0570-442d-9c3e-275b090ff376" />
 
-ion": "An ingestion pipeline that retrieves the latest daily commodity prices from the OGD API and loads only new or updated records into ADLS in JSON format. The pipeline uses Azure Key Vault to securely access the OGD API key and first collects API metadata to intelligently determine whether new data is available before performing any ingestion.",
+#### *bronze_layer*
+<img width="1721" height="625" alt="agri12" src="https://github.com/user-attachments/assets/b7d381e6-e425-43e6-bf31-d26e89b48da2" />
 
+A bronze-layer orchestration pipeline that triggers the mandi_ogd_api_ingestion pipeline, logs execution, monitors its status, and sends alerts if the ingestion process fails.
 
+*Working*
+- Using a Execute Pipeline Activity to execute mandi_ogdz_api_ingestion pipeline.
 
+<img width="1670" height="660" alt="agri13" src="https://github.com/user-attachments/assets/96fec529-7d98-418e-9a0b-071c0dac23b9" />
+
+- Using a Set variable Activity to set the value of `logs` pipeline variable.
+
+<img width="1737" height="640" alt="agri14" src="https://github.com/user-attachments/assets/51650834-0662-4370-96fb-02049bdf981d" />
+
+- Using a Set variable Activity to set the value of `status` pipeline variable.
+
+<img width="1677" height="612" alt="agri15" src="https://github.com/user-attachments/assets/421f82b9-e644-4803-8c72-bf48eaf27157" />
+
+- Using an If Condition activity to trigger an alert when `mandi_ogd_api_ingestion` fails.
+<img width="1560" height="618" alt="agri16" src="https://github.com/user-attachments/assets/97f1bbfd-98df-467b-814f-646ee90cbe7f" />
 
