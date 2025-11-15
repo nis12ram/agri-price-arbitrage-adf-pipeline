@@ -71,8 +71,21 @@ An ingestion pipeline that retrieves the latest daily commodity prices from the 
   
 <img width="986" height="697" alt="agri4" src="https://github.com/user-attachments/assets/a60fcaf8-be94-4479-aab9-a88f81d88375" />
 
+- Using an If Condition activity to intelligently decide whether new data needs to be loaded.
 
-"description": "An ingestion pipeline that retrieves the latest daily commodity prices from the OGD API and loads only new or updated records into ADLS in JSON format. The pipeline uses Azure Key Vault to securely access the OGD API key and first collects API metadata to intelligently determine whether new data is available before performing any ingestion.",
+<img width="1706" height="633" alt="agri5" src="https://github.com/user-attachments/assets/e41080ab-498d-4ed5-bba3-7979ab47854e" />
+
+- Using a Copy Activity to bring data API to ADLS.
+  
+<img width="1700" height="737" alt="agri6" src="https://github.com/user-attachments/assets/961aee32-90c7-4053-81d8-33303a02e414" />
+<img width="1742" height="658" alt="agri7" src="https://github.com/user-attachments/assets/73aca41b-809d-45bb-b2c7-2584f53e7898" />
+<img width="1712" height="687" alt="agri8" src="https://github.com/user-attachments/assets/7da8bc27-fec8-4a67-b65f-6bf35f72dd88" />
+
+**Surya's optimizations = ["Dynamic pagination rules", "Setting maximum number of retry attempts to 2", "Using parametrized datasets(dynamic_rest_api(params = [base_url ,relative_url]), dynamic_json(params = [container, folder, file])"]**
+
+- Using a Copy Activity to update the date of the pipeline's last data refresh
+
+ion": "An ingestion pipeline that retrieves the latest daily commodity prices from the OGD API and loads only new or updated records into ADLS in JSON format. The pipeline uses Azure Key Vault to securely access the OGD API key and first collects API metadata to intelligently determine whether new data is available before performing any ingestion.",
 
 
 
