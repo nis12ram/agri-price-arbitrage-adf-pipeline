@@ -57,6 +57,21 @@ An ingestion pipeline that retrieves the latest daily commodity prices from the 
 
 **Surya's optimizations = ["Setting maximum number of retry attempts to 2", "Enabling Secure Input & Output options to prevent API key from being exposed in logs."]**
 
+- Using a Set Activity to set the value of `ogd_api_key` pipeline variable.
+
+<img width="747" height="527" alt="agri2" src="https://github.com/user-attachments/assets/e78aa949-67d9-4a04-8e13-2406391b5fea" />
+
+- Using a Web Activity to fetch the metadata of the [**OGD API DATA**](https://www.data.gov.in/catalog/current-daily-price-various-commodities-various-markets-mandi).
+  
+<img width="735" height="687" alt="agri3" src="https://github.com/user-attachments/assets/08886892-15f1-42d8-a740-ff0ced793168" />
+
+**Surya's optimizations = ["Setting maximum number of retry attempts to 2", "Enabling Secure Input to prevent API key from being exposed in logs."]**
+
+- Using a Lookup Activity to retrieve the date of pipeline's last data refresh.
+  
+<img width="986" height="697" alt="agri4" src="https://github.com/user-attachments/assets/a60fcaf8-be94-4479-aab9-a88f81d88375" />
+
+
 "description": "An ingestion pipeline that retrieves the latest daily commodity prices from the OGD API and loads only new or updated records into ADLS in JSON format. The pipeline uses Azure Key Vault to securely access the OGD API key and first collects API metadata to intelligently determine whether new data is available before performing any ingestion.",
 
 
