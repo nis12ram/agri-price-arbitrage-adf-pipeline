@@ -67,7 +67,7 @@ An ingestion pipeline that retrieves the latest daily commodity prices from the 
 
 **Surya's optimizations = ["Setting maximum number of retry attempts to 2", "Enabling Secure Input to prevent API key from being exposed in logs."]**
 
-- Using a Lookup Activity to retrieve the date of pipeline's last data refresh.
+- Using a Lookup Activity to retrieve the date when the `bronze_layer` pipeline last updated data.
   
 <img width="986" height="697" alt="agri4" src="https://github.com/user-attachments/assets/a60fcaf8-be94-4479-aab9-a88f81d88375" />
 
@@ -117,9 +117,28 @@ A silver-layer pipeline that intelligently transforms only new raw JSON data fro
 
 *Working*
 - Using a Lookup activity to retrieve the date when the `silver_layer` pipeline last processed data.
+
 <img width="946" height="637" alt="agri18" src="https://github.com/user-attachments/assets/038ae160-7c2e-4455-96b6-e535e5a9b798" />
 
-- 
+- Using a Lookup Activity to retrieve the date when the `bronze_layer` pipeline last updated data.
 
+<img width="942" height="635" alt="agri19" src="https://github.com/user-attachments/assets/8ae063c8-e2f7-42dc-a218-79ec826d1082" />
 
+- Using an If Condition activity to intelligently decide whether new data needs to be processed.
+
+<img width="1712" height="678" alt="agri20" src="https://github.com/user-attachments/assets/ff876d9d-b749-4f71-9b35-37a14f54f3ba" />
+
+- Using a Data Flow Activity to execute `data_transformation` data flow.
+
+<img width="1663" height="727" alt="agri21" src="https://github.com/user-attachments/assets/b150ac4d-ed94-4fd5-86c6-23df45c6fa94" />
+
+<img width="1833" height="565" alt="agri22" src="https://github.com/user-attachments/assets/1abb7dbb-3b41-4c09-b927-30ce62862813" />
+
+- Using a Copy activity to update the date when the pipeline last processed data.
+  
+<img width="1087" height="582" alt="agri23" src="https://github.com/user-attachments/assets/a5fd9b42-de62-4a4d-962d-244aecdc9fc2" />
+<img width="1687" height="727" alt="agri24" src="https://github.com/user-attachments/assets/2b75b3b1-0b71-410a-b184-adec55dace0a" />
+<img width="1122" height="571" alt="agri25" src="https://github.com/user-attachments/assets/2f6f8611-e105-46ef-a261-c8c2958cd81b" />
+
+#### *gold_layer*
 
