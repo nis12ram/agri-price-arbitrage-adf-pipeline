@@ -45,8 +45,8 @@ Since the transformations are not highly complex, Surya opted to use ADF Data Fl
 ## *Pipeline*
 Surya designs a multi-layered data pipeline using Azure Data Factory (ADF)
 
-### **Pipeline for bronze layer**
-#### *mandi_ogd_api_ingestion*
+
+### *mandi_ogd_api_ingestion*
 <img width="1743" height="616" alt="adf_rest_api_ingestion_edited" src="https://github.com/user-attachments/assets/5a78e6a7-eed3-4431-b965-19d0137cc9c3" />
 
 An ingestion pipeline that retrieves the latest daily commodity prices from the OGD API and loads only new or updated records.
@@ -71,11 +71,11 @@ An ingestion pipeline that retrieves the latest daily commodity prices from the 
   
 <img width="986" height="697" alt="agri4" src="https://github.com/user-attachments/assets/a60fcaf8-be94-4479-aab9-a88f81d88375" />
 
-- Using an If Condition activity to intelligently decide whether new data needs to be loaded.
+- Using an If Condition activity to intelligently decide whether new data is their to load.
 
 <img width="1706" height="633" alt="agri5" src="https://github.com/user-attachments/assets/e41080ab-498d-4ed5-bba3-7979ab47854e" />
 
-- Using a Copy Activity to bring data API to ADLS.
+- Using a Copy Activity to bring data from OGD API to bronze container of ADLS.
   
 <img width="1700" height="737" alt="agri6" src="https://github.com/user-attachments/assets/961aee32-90c7-4053-81d8-33303a02e414" />
 <img width="1742" height="658" alt="agri7" src="https://github.com/user-attachments/assets/73aca41b-809d-45bb-b2c7-2584f53e7898" />
@@ -89,7 +89,7 @@ An ingestion pipeline that retrieves the latest daily commodity prices from the 
 <img width="1742" height="721" alt="agri10" src="https://github.com/user-attachments/assets/3816ea5d-e546-4ce7-9f42-2e87ea85b635" />
 <img width="997" height="582" alt="agri11" src="https://github.com/user-attachments/assets/04c82f2f-0570-442d-9c3e-275b090ff376" />
 
-#### *bronze_layer*
+### *bronze_layer*
 <img width="1721" height="625" alt="agri12" src="https://github.com/user-attachments/assets/b7d381e6-e425-43e6-bf31-d26e89b48da2" />
 
 A bronze-layer orchestration pipeline that triggers the mandi_ogd_api_ingestion pipeline, logs execution, monitors its status, and sends alerts if the ingestion process fails.
@@ -110,7 +110,7 @@ A bronze-layer orchestration pipeline that triggers the mandi_ogd_api_ingestion 
 - Using an If Condition activity to trigger an alert when `mandi_ogd_api_ingestion` fails.
 <img width="1560" height="618" alt="agri16" src="https://github.com/user-attachments/assets/97f1bbfd-98df-467b-814f-646ee90cbe7f" />
 
-#### *silver_layer*
+### *silver_layer*
 <img width="1605" height="577" alt="agri17" src="https://github.com/user-attachments/assets/711fab80-009f-48d9-96cb-c02e5ab60668" />
 
 A silver-layer pipeline that intelligently transforms only new raw JSON data from the bronze layer in ADLS using a data flow named data_transformation. The processed data is then stored in ADLS in Delta format.
@@ -124,7 +124,7 @@ A silver-layer pipeline that intelligently transforms only new raw JSON data fro
 
 <img width="942" height="635" alt="agri19" src="https://github.com/user-attachments/assets/8ae063c8-e2f7-42dc-a218-79ec826d1082" />
 
-- Using an If Condition activity to intelligently decide whether new data needs to be processed.
+- Using an If Condition activity to intelligently decide whether new data is their to process.
 
 <img width="1712" height="678" alt="agri20" src="https://github.com/user-attachments/assets/ff876d9d-b749-4f71-9b35-37a14f54f3ba" />
 
@@ -134,11 +134,33 @@ A silver-layer pipeline that intelligently transforms only new raw JSON data fro
 
 <img width="1833" height="565" alt="agri22" src="https://github.com/user-attachments/assets/1abb7dbb-3b41-4c09-b927-30ce62862813" />
 
-- Using a Copy activity to update the date when the pipeline last processed data.
+- Using a Copy activity to update the pipeline’s last processed date..
   
 <img width="1087" height="582" alt="agri23" src="https://github.com/user-attachments/assets/a5fd9b42-de62-4a4d-962d-244aecdc9fc2" />
 <img width="1687" height="727" alt="agri24" src="https://github.com/user-attachments/assets/2b75b3b1-0b71-410a-b184-adec55dace0a" />
 <img width="1122" height="571" alt="agri25" src="https://github.com/user-attachments/assets/2f6f8611-e105-46ef-a261-c8c2958cd81b" />
 
-#### *gold_layer*
+### *gold_layer*
+<img width="1715" height="598" alt="agri26" src="https://github.com/user-attachments/assets/c3e46e69-daad-4582-9e31-b442329c7a8e" />
+
+A gold-layer pipeline that intelligently processes only new data from the silver layer, using a data flow named `data_serving` to generate a business-ready view that highlights in-state commodity price arbitrage opportunities. The resulting curated dataset is stored in ADLS in Delta format.
+
+*Working*
+- Using a Lookup activity to retrieve the date when the `gold_layer` pipeline last processed data.
+
+<img width="1172" height="598" alt="agri27" src="https://github.com/user-attachments/assets/51b46bd6-9ab1-46bf-aa98-6d4f0fa2bb14" />
+
+- Using a Lookup activity to retrieve the date when the `silver_layer` pipeline last processed data.
+
+<img width="1103" height="612" alt="agri28" src="https://github.com/user-attachments/assets/ed64d2b7-5a2b-4419-940f-1031e445c64f" />
+
+- Using an If Condition activity to intelligently decide whether new data is their to process.
+
+<img width="1736" height="730" alt="agri29" src="https://github.com/user-attachments/assets/6d4ecbce-7f74-4e3b-8cac-d5f55e5cda06" />
+
+- Using a Data Flow Activity to execute `data_serving` data flow.
+
+<img width="1753" height="722" alt="agri30" src="https://github.com/user-attachments/assets/bb1a1cb4-1eea-42db-b1d8-c3ea7a0c2dd5" />
+<img width="820" height="506" alt="agri31" src="https://github.com/user-attachments/assets/01fd1af8-7236-4673-babf-28d40ed1e73f" />
+<img width="1792" height="623" alt="agri32" src="https://github.com/user-attachments/assets/4f64dfe2-ffcd-4315-a98f-baf2fe4bf467" />
 
