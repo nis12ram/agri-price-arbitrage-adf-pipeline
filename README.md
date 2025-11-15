@@ -164,3 +164,10 @@ A gold-layer pipeline that intelligently processes only new data from the silver
 <img width="820" height="506" alt="agri31" src="https://github.com/user-attachments/assets/01fd1af8-7236-4673-babf-28d40ed1e73f" />
 <img width="1792" height="623" alt="agri32" src="https://github.com/user-attachments/assets/4f64dfe2-ffcd-4315-a98f-baf2fe4bf467" />
 
+- Using a Copy activity to update the pipeline’s last processed date..
+
+<img width="1182" height="580" alt="agri33" src="https://github.com/user-attachments/assets/45498462-aa62-429d-8760-0836b8d76d4f" />
+<img width="1835" height="778" alt="agri34" src="https://github.com/user-attachments/assets/096a5669-f035-4f87-84d1-0d0bb53feb22" />
+<img width="1147" height="583" alt="agri35" src="https://github.com/user-attachments/assets/6bf9db62-0bb7-49f3-9de9-2c5f4800fa04" />
+
+### *main_layer*
