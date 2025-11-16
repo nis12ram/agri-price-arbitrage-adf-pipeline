@@ -38,7 +38,7 @@ To solve AgriBridge's problem, Surya decided to use ***medallion lakehouse archi
 - ***Sink Data Format***: Delta Table
 
 ## *Tools*
-From the initial analysis, Surya found that the daily data volume is only a few megabytes and the required transformations are moderately complex. Based on this, Surya chose ***Azure Data Factory*** for ******data orchestration, movement, and transformation*****. 
+From the initial analysis, Surya found that the daily data volume is only a few megabytes and the required transformations are moderately complex. Based on this, Surya choose ***Azure Data Factory*** for ******data orchestration, movement, and transformation*****. 
 
 Since the transformations are not highly complex, Surya opted to use ADF Data Flows instead of Databricks.
 
