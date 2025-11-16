@@ -116,22 +116,12 @@
 									"type": "DataFlowReference",
 									"parameters": {
 										"price_diff_threshold": {
-											"value": "'0.2'",
+											"value": "'0.09'",
 											"type": "Expression"
 										},
 										"date_to_filter": {
 											"value": "'@{activity('get_silver_last_processed_date').output.value[0].last_processed_date}'",
 											"type": "Expression"
-										}
-									},
-									"datasetParameters": {
-										"csvSink": {
-											"container": "gold",
-											"folder": "ogd_mandi_api",
-											"file": {
-												"value": "@{activity('get_silver_last_processed_date').output.value[0].last_processed_date}.csv",
-												"type": "Expression"
-											}
 										}
 									}
 								},
