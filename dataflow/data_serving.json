@@ -19,13 +19,6 @@
 						"type": "LinkedServiceReference"
 					},
 					"name": "deltaSink"
-				},
-				{
-					"dataset": {
-						"referenceName": "dynamic_csv",
-						"type": "DatasetReference"
-					},
-					"name": "csvSink"
 				}
 			],
 			"transformations": [
@@ -188,15 +181,7 @@
 				"     postCommands: [],",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
-				"     saveOrder: 1) ~> deltaSink",
-				"alterRow sink(allowSchemaDrift: true,",
-				"     validateSchema: false,",
-				"     umask: 0022,",
-				"     preCommands: [],",
-				"     postCommands: [],",
-				"     skipDuplicateMapInputs: true,",
-				"     skipDuplicateMapOutputs: true,",
-				"     partitionBy('hash', 1)) ~> csvSink"
+				"     saveOrder: 0) ~> deltaSink"
 			]
 		}
 	}
