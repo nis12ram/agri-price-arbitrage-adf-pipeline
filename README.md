@@ -1,4 +1,5 @@
 # **agri-price-arbitrage-adf-pipeline** (***PROJECT 1***)
+<img width="3194" height="1354" alt="agri_poster1" src="https://github.com/user-attachments/assets/f640b26e-caba-4733-95ea-d13439b49457" />
 
 Azure Data Factory (ADF) pipeline for AgriBridge Commodities Limited to ingest and process daily agricultural price data. The pipeline identifies in-state commodity price arbitrage opportunities (price differences for the same item within the same state) to generate actionable profit insights for the trading team.
 
