@@ -1,9 +1,18 @@
 # **agri-price-arbitrage-adf-pipeline** (***PROJECT 1***)
 <img width="3194" height="1354" alt="agri_poster1" src="https://github.com/user-attachments/assets/f640b26e-caba-4733-95ea-d13439b49457" />
 
-**Azure Data Factory (ADF) pipeline for AgriBridge Commodities Limited to ingest and process daily agricultural price data. The pipeline identifies in-state commodity price arbitrage opportunities (price differences for the same item within the same state) to generate actionable profit insights for the trading team.**
+## *Project Overview*
+agri-price-arbitrage-adf-pipeline is an end-to-end Azure Data Engineering project that builds a production-ready batch pipeline for agricultural price analysis.
 
-## *Story Time*
+The pipeline ingests daily commodity prices from a government REST API and transforms raw, semi-structured data into business-ready insights that identify in-state price arbitrage opportunities for the same commodity (same variety and grade).
+
+Using Azure Data Factory and ADLS Gen2 with Delta Lake, the solution follows a Medallion Architecture (Bronze → Silver → Gold) with incremental processing, secure ingestion, fault tolerance, and idempotent writes.
+
+The final gold dataset highlights profitable price gaps (>8%), enabling traders to make fast, data-driven decisions every morning.
+
+Tech Stack: Azure Data Factory | ADLS Gen2 | Delta Lake | ADF Data Flows | Azure Key Vault | REST API
+
+## *Business Problem & Context*
 AgriBridge Commodities Limited is an agricultural trading company based in Delhi, operating across India.
 
 Their main goal is to find immediate, actionable profit opportunities. Their strategy is to identify price differences for the exact same item (same commodity, variety, and grade) within the same state.
@@ -14,7 +23,7 @@ To do this, they hired Surya, a data engineer👨‍💻. His job is to get the 
 
 ***Next, we’ll explore how Surya***👨‍💻 ***tackles this problem...***
 
-## *Architecture Overview*
+## *Architecture*
 To solve AgriBridge's problem, Surya decided to use ***medallion lakehouse architecture*** to build a clean, trustworthy, and durable data pipeline.
 
 ### **Bronze Layer** – Raw Ingestion
