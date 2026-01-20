@@ -1,4 +1,4 @@
-# **agri-price-arbitrage-adf-pipeline** (***PROJECT 1***)
+# **agri-price-arbitrage-adf-pipeline** | _An End-to-End Azure Lakehouse Project for In-State Commodity Price Arbitrage_ (***project 1***)
 <img width="3194" height="1354" alt="agri_poster1" src="https://github.com/user-attachments/assets/f640b26e-caba-4733-95ea-d13439b49457" />
 
 ## *Project Overview*
