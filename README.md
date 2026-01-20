@@ -2,21 +2,18 @@
 <img width="3194" height="1354" alt="agri_poster1" src="https://github.com/user-attachments/assets/f640b26e-caba-4733-95ea-d13439b49457" />
 
 ## *Project Overview*
-agri-price-arbitrage-adf-pipeline is an Azure-based data engineering solution designed to automate the ingestion, transformation, and serving of daily agricultural commodity price data to identify in-state price arbitrage opportunities for an agricultural trading business.
+**agri-price-arbitrage-adf-pipeline** is an **Azure-based data engineering solution** designed to automate the ingestion, transformation, and serving of **daily agricultural commodity price data** to identify **in-state price arbitrage opportunities** for an agricultural trading business.
 
-The project addresses the business challenge of converting raw, semi-structured government API data into a clean, reliable, and analytics-ready dataset that highlights price differences for the same commodity (same variety and grade) across markets within the same state, enabling fast and actionable trading decisions.
+The project addresses the business challenge of converting **raw, semi-structured government API data** into a **clean, reliable, and analytics-ready dataset** that highlights **price differences for the same commodity (same variety and grade) across markets within the same state**, enabling fast and actionable trading decisions.
 
 The pipeline is built using:
 
-Azure Data Factory (Orchestration & Processing): Parameterized pipelines for secure REST API ingestion, incremental data loading using last-processed tracking, schema flattening and cleansing using Mapping Data Flows, and fault-tolerant execution with retries, conditional logic, and failure alerts.
+- **Azure Data Factory (Orchestration & Processing):** Parameterized pipelines for secure REST API ingestion, incremental data loading using last-processed tracking, schema flattening and cleansing using Mapping Data Flows, and fault-tolerant execution with retries, conditional logic, and failure alerts.
+- **Azure Data Lake Storage Gen2 (Layered Storage):** Bronze, Silver, and Gold containers to manage raw ingestion, standardized cleansed data, and curated business-ready datasets.
+- **Delta Lake (Sink):** Reliable and idempotent storage with UPSERT and overwrite strategies to prevent duplicates, support reruns, and maintain data consistency across pipeline executions.
+- **Azure Key Vault (Security):** Secure management of API credentials with protected inputs and outputs to prevent sensitive data exposure.
 
-Azure Data Lake Storage Gen2 (Layered Storage): Bronze, Silver, and Gold containers to manage raw ingestion, standardized cleansed data, and curated business-ready datasets.
-
-Delta Lake (Sink): Reliable and idempotent storage with UPSERT and overwrite strategies to prevent duplicates, support reruns, and maintain data consistency across pipeline executions.
-
-Azure Key Vault (Security): Secure management of API credentials with protected inputs and outputs to prevent sensitive data exposure.
-
-The solution applies robust data engineering practices to handle nested JSON schemas, incremental daily updates, data deduplication, and business-rule-driven transformations, resulting in a gold dataset that surfaces profitable price gaps (>8%) within each state.
+The solution applies robust data engineering practices to handle **nested JSON schemas, incremental daily updates, data deduplication, and business-rule-driven transformations**, resulting in a **gold dataset that surfaces profitable price gaps (>8%) within each state**.
 
 ## *Business Problem & Context*
 AgriBridge Commodities Limited is an agricultural trading company based in Delhi, operating across India.
